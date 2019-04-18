@@ -1,0 +1,50 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use v5.10.0;
+
+use WebService::Spotify;
+use WebService::Spotify::Util;
+
+use Data::Dumper qw(Dumper);
+
+$Data::Dumper::Indent = 1;
+$Data::Dumper::Terse = 1;
+
+my $clientId     = '244195190a2b42ecb9ad3a62296862b0';
+my $clientSecret = '3867e0be1f33467ba56af081e14e26de';
+
+$ENV{SPOTIFY_CLIENT_ID}     = $clientId;
+$ENV{SPOTIFY_CLIENT_SECRET} = $clientSecret;
+$ENV{SPOTIFY_REDIRECT_URI}  = 'https://httpbin.org/get';
+
+my $userName = shift(@ARGV);
+
+my $scope = 'playlist-modify-public';
+my $token = WebService::Spotify::Util::prompt_for_user_token($userName, $scope);
+
+if (!$token) {
+    die("Can't get token for $userName\n");
+}
+
+my $spotify = WebService::Spotify->new(auth => $token);
+my $me = $spotify->me();
+# print Dumper $me;
+my $userId = $me->{id};
+
+my $importPlaylist;
+
+page:
+for (my $playlists = $spotify->user_playlists($userId); $playlists; $playlists = $spotify->next($playlists)) {
+  playlist:
+    foreach my $playlist (@{$playlists->{items}}) {
+        if ($playlist->{name} eq 'spotify-import playlist') {
+            $importPlaylist = $playlist;
+            last page;
+        }
+    }
+}
+
+if (!$importPlaylist) {
+    my $newPlaylist = $spotify->user_playlist_create($userId, "spotify-import playlist", public => 1);
+}
